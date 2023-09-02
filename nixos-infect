@@ -40,6 +40,9 @@ makeConf() {
   networking.hostName = "$(hostname -s)";
   networking.domain = "$(hostname -d)";
   services.openssh.enable = true;
+  services.openssh.settings.PermitRootLogin = "yes";
+  users.mutableUsers = false;
+  users.users.hashedPassword = "!";
   users.users.root.openssh.authorizedKeys.keys = [$(while read -r line; do echo -n "
     ''$line'' "; done <<< "$keys")
   ];
@@ -319,7 +322,7 @@ infect() {
   # shellcheck disable=SC1090
   source ~/.nix-profile/etc/profile.d/nix.sh
 
-  [[ -z "$NIX_CHANNEL" ]] && NIX_CHANNEL="nixos-22.11"
+  [[ -z "$NIX_CHANNEL" ]] && NIX_CHANNEL="nixos-23.05"
   nix-channel --remove nixpkgs
   nix-channel --add "https://nixos.org/channels/$NIX_CHANNEL" nixos
   nix-channel --update
@@ -370,9 +373,8 @@ infect() {
   /nix/var/nix/profiles/system/bin/switch-to-configuration boot
 }
 
-[ "$PROVIDER" = "digitalocean" ] && doNetConf=y # digitalocean requires detailed network config to be generated
 [ "$PROVIDER" = "lightsail" ] && newrootfslabel="nixos"
-if [[ "$PROVIDER" = "digitalocean" ]] || [[ "$PROVIDER" = "servarica" ]] || [[ "$PROVIDER" = "hetznercloud" ]]; then
+if [[ -z "NETCONF" ]]; then
 	doNetConf=y # some providers require detailed network config to be generated
 fi
 
@@ -383,11 +385,14 @@ if [[ -z "$NO_SWAP" ]]; then
     makeSwap # smallest (512MB) droplet needs extra memory!
 fi
 makeConf
-infect
-if [[ -z "$NO_SWAP" ]]; then
-    removeSwap
-fi
 
-if [[ -z "$NO_REBOOT" ]]; then
-  reboot
+if [[ -z "$INFECT"]]; then
+  infect
+  if [[ -z "$NO_SWAP" ]]; then
+      removeSwap
+  fi
+
+  if [[ -z "$NO_REBOOT" ]]; then
+    reboot
+  fi
 fi
